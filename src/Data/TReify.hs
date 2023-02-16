@@ -16,17 +16,17 @@ module Data.TReify (
 
 import Control.Concurrent.MVar
 -- import Control.Monad
-import Control.Applicative (Applicative)
+
 import System.Mem.StableName (StableName, makeStableName, hashStableName)
 import Data.IntMap as M
 
 import Type.Reflection
 import Data.Type.Equality
 import Data.Reify.TGraph
-
+import Data.Kind (Type)
 
 class MuRef ty h where
-  type DeRef h :: (* -> *) -> * -> *  -- DeRef h v a
+  type DeRef h :: (Type-> Type) -> Type-> Type  -- DeRef h v a
 
   mapDeRef :: forall m v. (Applicative m)
            => (forall a. {-IsTyConstraint ty a => -} Typeable a => ty a -> h a -> m (        v a))
@@ -40,7 +40,7 @@ data StableBind ty h =
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns
 -- a 'Graph' that contains the dereferenced nodes, with their children as
 -- 'Integer' rather than recursive values.
-reifyGraph :: (TestEquality ty, Typeable a,{-IsTyConstraint ty a,-} MuRef ty h) =>
+reifyGraph :: (TestEquality ty, Typeable a,MuRef ty h) =>
               ty a -> h a -> IO (Graph ty (DeRef h) a)
 reifyGraph tya ha = do rt1   <- newMVar M.empty
                        rt2   <- newMVar []
@@ -49,14 +49,14 @@ reifyGraph tya ha = do rt1   <- newMVar M.empty
                        return (Graph binds root)
 
 
-findNodes :: forall ty h a. (TestEquality ty, Typeable a,{-IsTyConstraint ty a,-} MuRef ty h) 
+findNodes :: forall ty h a. (TestEquality ty, Typeable a, MuRef ty h) 
           => MVar (IntMap [StableBind ty h])
           -> MVar [Bind ty (DeRef h)]
           -> ty a -> h a -> IO (V ty a)
 findNodes rt1 rt2 tya ha =
   do nextI <- newMVar (0 :: Int)
      let newIndex = modifyMVar nextI (\ n -> return (n+1,n))
-         loop :: Typeable b =>{-IsTyConstraint ty b =>-}
+         loop :: Typeable b =>
                  ty b -> h b -> IO (V ty b)
          loop tyb !hb = do
                st  <- makeStableName hb
@@ -76,7 +76,7 @@ findNodes rt1 rt2 tya ha =
        in loop tya ha
 
 
-mylookup :: forall ty h a. (TestEquality ty,Typeable a {-,IsTyConstraint ty a-} ) =>
+mylookup :: forall ty h a. (TestEquality ty,Typeable a ) =>
             ty a -> StableName (h a) -> IntMap [StableBind ty h] -> Maybe (V ty a)
 mylookup tya sta tab =
    M.lookup (hashStableName sta) tab >>= llookup

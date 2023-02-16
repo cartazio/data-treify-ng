@@ -3,7 +3,7 @@
   #-}
 {-# LANGUAGE ScopedTypeVariables, ConstraintKinds, Rank2Types #-} -- for bindEnv
 
-{-# OPTIONS_GHC -Wall #-}
+
 
 module Data.Reify.TGraph
   ( ShowF(..), Id, V(..), Bind(..), bindEnv, Graph(..)

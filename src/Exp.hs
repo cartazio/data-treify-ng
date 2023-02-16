@@ -9,7 +9,7 @@
 
 module Exp where
 
-import Control.Applicative (pure,(<$>),(<*>))
+
 import qualified Data.IntMap as I
 import Data.Maybe (fromMaybe) -- ,fromJust
 
@@ -17,8 +17,8 @@ import Data.Maybe (fromMaybe) -- ,fromJust
 
 -- Import one of the following but not both
 import Data.Type.Equality
-import Type.Reflection (Typeable(..),TypeRep,typeRep)
-
+import Type.Reflection (Typeable,TypeRep,typeRep)
+import Data.Kind (Type)
 
 import Data.TReify (MuRef(..),ShowF(..),V(..),Graph(..),Bind(..),Id,reifyGraph)
 
@@ -29,7 +29,7 @@ import Data.TReify (MuRef(..),ShowF(..),V(..),Graph(..),Bind(..),Id,reifyGraph)
 ty :: Typeable a => TypeRep a 
 ty = typeRep 
 
-data Op :: * -> * where
+data Op :: Type -> Type where
   Add :: Num a  => Op (a -> a -> a)
   Mul :: Num a  => Op (a -> a -> a)
   Lit :: Show a => a -> Op a
@@ -43,14 +43,14 @@ instance Show (Op a) where show = showF
 
 -- Expressions, parameterized by variable type (constructor) and
 -- expression type.
-data E :: (* -> *) -> * -> * where
+data E :: (Type -> Type) -> Type -> Type where
   Op   :: Op a -> E v a
   (:^) :: (Typeable a, Typeable b) =>
           E v (a -> b) -> E v a -> E v b
   Let  :: v a -> E v a -> E v b -> E v b
   Var  :: v a -> E v a
 
-data N :: (* -> *) -> * -> * where
+data N :: (Type -> Type) -> Type -> Type where
   ON  :: Op a -> N v a
   App :: (Typeable a, Typeable b) =>
          v (a -> b) -> v a -> N v b
