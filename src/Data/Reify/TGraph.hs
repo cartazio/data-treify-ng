@@ -10,9 +10,14 @@ module Data.Reify.TGraph
   ) where
 
 -- For bindEnv
-import Data.IsTy
-import Data.Proof.EQ
+-- import Data.IsTy
+-- import Data.Proof.EQ
+import Type.Reflection
+import Data.Type.Equality
 import qualified Data.IntMap as I
+
+
+
 
 -- | Identifiers
 type Id = Int
@@ -36,7 +41,7 @@ instance Show (V ty a) where show = showF
 
 -- | Typed binding pair, parameterized by variable and node type
 -- constructors. 
-data Bind ty n = forall a. IsTyConstraint ty a => Bind (V ty a) (n (V ty) a)
+data Bind f n = forall a. Typeable  a => Bind (V f a) (n (V f) a)
 
 instance ShowF (n (V ty)) => Show (Bind ty n) where
   show (Bind v n) = showF v ++" = "++ showF n
@@ -52,20 +57,20 @@ bindEnv' (Bind (V i a) n : binds') v@(V i' a')
 
 -- | Fast version, using an IntMap.
 -- Important: partially apply.
-bindEnv :: forall ty n. [Bind ty n] -> 
-             forall a. (IsTy ty, IsTyConstraint ty a) => 
-               (V ty a -> n (V ty) a)
+bindEnv :: forall f n. [Bind f n] -> 
+             forall a. (Typeable a,TestEquality f) => 
+               (V f a -> n (V f) a)
 bindEnv binds = \ (V i' a') -> extract a' (I.lookup i' m)
  where
-   m :: I.IntMap (Bind ty n)
+   m :: I.IntMap (Bind f n)
    m = I.fromList [(i,b) | b@(Bind (V i _) _) <- binds]
 --    extract :: forall a'. IsTyConstraint ty a' => 
 --               ty a' -> Maybe (Bind ty n) -> n (V ty) a'
-   extract :: IsTyConstraint ty a => 
-              ty a -> Maybe (Bind ty n) -> n (V ty) a
+   extract :: TestEquality f  => 
+              f a -> Maybe (Bind f n) -> n (V f) a
    extract _ Nothing            = error "bindEnv: variable not found"
    extract a' (Just (Bind (V _ a) n))
-     | Just Refl <- a `tyEq` a' = n
+     | Just Refl <- a `testEquality` a' = n
      | otherwise                = error "bindEnv: wrong type"
 
 -- TODO: Does the partial application *really* avoid the IntMap reconstruction?

@@ -20,9 +20,8 @@ import Control.Applicative (Applicative)
 import System.Mem.StableName (StableName, makeStableName, hashStableName)
 import Data.IntMap as M
 
-import Data.IsTy
-
-import Data.Proof.EQ ((:=:)(..))
+import Type.Reflection
+import Data.Type.Equality
 import Data.Reify.TGraph
 
 
@@ -30,18 +29,18 @@ class MuRef ty h where
   type DeRef h :: (* -> *) -> * -> *  -- DeRef h v a
 
   mapDeRef :: forall m v. (Applicative m)
-           => (forall a. IsTyConstraint ty a => ty a -> h a -> m (        v a))
-           -> (forall a. IsTyConstraint ty a => ty a -> h a -> m (DeRef h v a))
+           => (forall a. {-IsTyConstraint ty a => -} Typeable a => ty a -> h a -> m (        v a))
+           -> (forall a. {-IsTyConstraint ty a => -} Typeable a => ty a -> h a -> m (DeRef h v a))
 
 
 data StableBind ty h =
-  forall a. IsTyConstraint ty a => StableBind (V ty a) (StableName (h a))
+  forall a.{- IsTyConstraint ty a => -} Typeable a =>StableBind (V ty a) (StableName (h a))
 
 
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns
 -- a 'Graph' that contains the dereferenced nodes, with their children as
 -- 'Integer' rather than recursive values.
-reifyGraph :: (IsTy ty, IsTyConstraint ty a, MuRef ty h) =>
+reifyGraph :: (TestEquality ty, Typeable a,{-IsTyConstraint ty a,-} MuRef ty h) =>
               ty a -> h a -> IO (Graph ty (DeRef h) a)
 reifyGraph tya ha = do rt1   <- newMVar M.empty
                        rt2   <- newMVar []
@@ -50,14 +49,14 @@ reifyGraph tya ha = do rt1   <- newMVar M.empty
                        return (Graph binds root)
 
 
-findNodes :: forall ty h a. (IsTy ty, IsTyConstraint ty a, MuRef ty h) 
+findNodes :: forall ty h a. (TestEquality ty, Typeable a,{-IsTyConstraint ty a,-} MuRef ty h) 
           => MVar (IntMap [StableBind ty h])
           -> MVar [Bind ty (DeRef h)]
           -> ty a -> h a -> IO (V ty a)
 findNodes rt1 rt2 tya ha =
   do nextI <- newMVar (0 :: Int)
      let newIndex = modifyMVar nextI (\ n -> return (n+1,n))
-         loop :: IsTyConstraint ty b =>
+         loop :: Typeable b =>{-IsTyConstraint ty b =>-}
                  ty b -> h b -> IO (V ty b)
          loop tyb !hb = do
                st  <- makeStableName hb
@@ -77,7 +76,7 @@ findNodes rt1 rt2 tya ha =
        in loop tya ha
 
 
-mylookup :: forall ty h a. (IsTy ty, IsTyConstraint ty a) =>
+mylookup :: forall ty h a. (TestEquality ty,Typeable a {-,IsTyConstraint ty a-} ) =>
             ty a -> StableName (h a) -> IntMap [StableBind ty h] -> Maybe (V ty a)
 mylookup tya sta tab =
    M.lookup (hashStableName sta) tab >>= llookup
@@ -85,7 +84,7 @@ mylookup tya sta tab =
    llookup :: [StableBind ty h] -> Maybe (V ty a)
    llookup [] = Nothing
    llookup (StableBind v@(V _ tyb) stb : binds') 
-     | Just Refl <- tya `tyEq` tyb, sta == stb = Just v
+     | Just Refl <- tya `testEquality` tyb, sta == stb = Just v
      | otherwise                               = llookup binds'
 
 -- unsafeReify :: (IsTy ty, MuRef ty h) => ty a -> h a -> Graph ty (DeRef h) a
