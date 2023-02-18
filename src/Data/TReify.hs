@@ -29,12 +29,12 @@ class MuRef ty h where
   type DeRef h :: (Type-> Type) -> Type-> Type  -- DeRef h v a
 
   mapDeRef :: forall m v. (Applicative m)
-           => (forall a. {-IsTyConstraint ty a => -} Typeable a => ty a -> h a -> m (        v a))
-           -> (forall a. {-IsTyConstraint ty a => -} Typeable a => ty a -> h a -> m (DeRef h v a))
+           => (forall a. Typeable a => ty a -> h a -> m (        v a))
+           -> (forall a. Typeable a => ty a -> h a -> m (DeRef h v a))
 
 
 data StableBind ty h =
-  forall a.{- IsTyConstraint ty a => -} Typeable a =>StableBind (V ty a) (StableName (h a))
+  forall a. Typeable a =>StableBind (V ty a) (StableName (h a))
 
 
 -- | 'reifyGraph' takes a data structure that admits 'MuRef', and returns
